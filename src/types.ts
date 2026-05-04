@@ -24,6 +24,8 @@ export interface Transaction {
   counterpartyIban: string;
   externalRef: string;
   internalRef: string;
+  matchedCustomer?: CustomerRecord;
+  matchConfidence?: MatchConfidence;
 }
 
 export interface DailyStatement {
@@ -104,4 +106,27 @@ export interface CrossCheckResult {
   ok: boolean;
   rows: CrossCheckRow[];
   summary: PdfSummary;
+}
+
+export interface CustomerRecord {
+  id: number;
+  name: string;
+  taxNumber: string;
+  country?: string;
+  code?: string | null;
+  city?: string;
+}
+
+export type MatchConfidence = "exact" | "prefix" | "fuzzy" | "none";
+
+export interface MatchResult {
+  matched: boolean;
+  customer?: CustomerRecord;
+  confidence: MatchConfidence;
+  score?: number;
+}
+
+export interface CustomerDb {
+  customers: CustomerRecord[];
+  loadedAt: string;
 }

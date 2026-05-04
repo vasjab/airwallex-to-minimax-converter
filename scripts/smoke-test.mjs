@@ -8,6 +8,7 @@ const { validate } = await import("../src/validator.ts");
 const { buildXmls } = await import("../src/builder.ts");
 const { summarize } = await import("../src/pdf-parser.ts");
 const { crossCheckPdf } = await import("../src/cross-check.ts");
+const { CustomerMatcher, parseCustomerJson } = await import("../src/customer-matcher.ts");
 
 const CSV_PATH = "/Users/vbocko/Downloads/Balance_Activity_Report_2026-04-30 (1).csv";
 const csv = readFileSync(CSV_PATH, "utf8");
@@ -38,6 +39,43 @@ const wallet = {
   ownerCountry: "SI",
   ownerTaxId: "11414928",
 };
+
+// Customer matching
+try {
+  const customerJson = readFileSync("data/customers.json", "utf8");
+  const customers = parseCustomerJson(customerJson);
+  const matcher = new CustomerMatcher(customers);
+  console.log(`\nCustomer DB: ${customers.length} records`);
+  const seen = new Set();
+  let matchedCount = 0;
+  let unmatchedCount = 0;
+  const ownerName = wallet.ownerName.trim().toLowerCase();
+  for (const tx of txs) {
+    const key = (tx.counterpartyName || "").toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    if (key === ownerName) {
+      console.log(`  ⊘ ${tx.counterpartyName} (self — skipped)`);
+      continue;
+    }
+    const r = matcher.match(tx.counterpartyName);
+    if (r.matched) {
+      matchedCount++;
+      console.log(`  ✓ [${r.confidence}] ${tx.counterpartyName} → ${r.customer.name} (TaxID ${r.customer.taxNumber})`);
+    } else {
+      unmatchedCount++;
+      console.log(`  · ${tx.counterpartyName} — no match`);
+    }
+  }
+  for (const tx of txs) {
+    if ((tx.counterpartyName || "").toLowerCase() === ownerName) continue;
+    const r = matcher.match(tx.counterpartyName);
+    if (r.matched) { tx.matchedCustomer = r.customer; tx.matchConfidence = r.confidence; }
+  }
+  console.log(`\n  Total: ${matchedCount} matched, ${unmatchedCount} unmatched (unique counterparties)`);
+} catch (e) {
+  console.log(`\nCustomer DB not available: ${e.message}`);
+}
 
 mkdirSync(".smoke/out", { recursive: true });
 

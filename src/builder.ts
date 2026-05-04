@@ -227,18 +227,31 @@ function counterpartyPartyXml(
   tx: Transaction,
   wallet: WalletConfig,
 ): string {
-  const name = tx.counterpartyName || tx.description.slice(0, 70) || "UNKNOWN";
+  const matched = tx.matchedCustomer;
+  const name = matched?.name || tx.counterpartyName || tx.description.slice(0, 70) || "UNKNOWN";
   const sameAsOwner = tx.counterpartyName.trim().toLowerCase() === wallet.ownerName.trim().toLowerCase();
-  const ctry = sameAsOwner
-    ? wallet.ownerCountry
-    : (inferCountry(tx.counterpartyIban) || wallet.ownerCountry);
+  const ctry = matched?.country
+    || (sameAsOwner ? wallet.ownerCountry : (inferCountry(tx.counterpartyIban) || wallet.ownerCountry));
+  const idBlock = matched
+    ? `                <Id>
+                  <OrgId>
+                    <Othr>
+                      <Id>${esc(truncate(matched.taxNumber, 35))}</Id>
+                      <SchmeNm>
+                        <Cd>TXID</Cd>
+                      </SchmeNm>
+                    </Othr>
+                  </OrgId>
+                </Id>
+`
+    : "";
   return `              <${tag}>
                 <Nm>${esc(truncate(name, 140))}</Nm>
                 <PstlAdr>
                   <Ctry>${esc(ctry)}</Ctry>
                   <AdrLine>NOTPROVIDED</AdrLine>
                 </PstlAdr>
-              </${tag}>
+${idBlock}              </${tag}>
 `;
 }
 

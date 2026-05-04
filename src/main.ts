@@ -5,6 +5,7 @@ import { validate } from "./validator";
 import { buildXmls } from "./builder";
 import { parseAirwallexPdf } from "./pdf-parser";
 import { crossCheckPdf } from "./cross-check";
+import { CustomerMatcher, parseCustomerJson } from "./customer-matcher";
 import {
   loadWallets,
   saveWallets,
@@ -14,11 +15,14 @@ import {
 } from "./settings";
 import type {
   CrossCheckResult,
+  CustomerRecord,
   PdfSummary,
   Transaction,
   ValidationResult,
   WalletConfig,
 } from "./types";
+
+const CUSTOMERS_KEY = "awx-minimax-customers-v1";
 
 interface AppState {
   csv: { name: string; text: string } | null;
@@ -27,6 +31,9 @@ interface AppState {
   detectedCurrency: string;
   pdf: PdfSummary | null;
   crossCheck: CrossCheckResult | null;
+  matcher: CustomerMatcher | null;
+  customerDbName: string | null;
+  customerDbCount: number;
 }
 
 const state: AppState = {
@@ -36,6 +43,9 @@ const state: AppState = {
   detectedCurrency: "EUR",
   pdf: null,
   crossCheck: null,
+  matcher: null,
+  customerDbName: null,
+  customerDbCount: 0,
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -53,17 +63,21 @@ const fields = {
   perDay: $<HTMLInputElement>("f-perday"),
   file: $<HTMLInputElement>("f-file"),
   pdf: $<HTMLInputElement>("f-pdf"),
+  customers: $<HTMLInputElement>("f-customers"),
 };
 
 const drop = $<HTMLLabelElement>("drop");
 const dropPdf = $<HTMLLabelElement>("drop-pdf");
+const dropCustomers = $<HTMLLabelElement>("drop-customers");
 const fileInfo = $<HTMLDivElement>("file-info");
 const pdfInfo = $<HTMLDivElement>("pdf-info");
+const customersInfo = $<HTMLDivElement>("customers-info");
 const previewCard = $<HTMLDivElement>("preview-card");
 const actionCard = $<HTMLDivElement>("action-card");
 const summary = $<HTMLDivElement>("summary");
 const issuesEl = $<HTMLDivElement>("issues");
 const crossCheckEl = $<HTMLDivElement>("crosscheck");
+const matchStatusEl = $<HTMLDivElement>("match-status");
 const dayTable = $<HTMLDivElement>("day-table");
 const generateBtn = $<HTMLButtonElement>("generate");
 const genStatus = $<HTMLParagraphElement>("gen-status");
@@ -73,6 +87,7 @@ function init(): void {
   const prefs = loadPrefs();
   fields.perDay.checked = prefs.perDay;
   loadWalletIntoForm(currentWallet());
+  loadCachedCustomers();
 
   fields.perDay.addEventListener("change", () => {
     savePrefs({ perDay: fields.perDay.checked });
@@ -121,9 +136,144 @@ function init(): void {
     if (f) void handlePdfFile(f);
   });
 
+  fields.customers.addEventListener("change", () => {
+    const f = fields.customers.files?.[0];
+    if (f) void handleCustomersFile(f);
+  });
+  dropCustomers.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropCustomers.classList.add("dragover");
+  });
+  dropCustomers.addEventListener("dragleave", () => dropCustomers.classList.remove("dragover"));
+  dropCustomers.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropCustomers.classList.remove("dragover");
+    const f = e.dataTransfer?.files?.[0];
+    if (f) void handleCustomersFile(f);
+  });
+
   generateBtn.addEventListener("click", () => {
     void generate();
   });
+}
+
+function loadCachedCustomers(): void {
+  try {
+    const raw = localStorage.getItem(CUSTOMERS_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { customers: CustomerRecord[]; loadedAt: string; name?: string };
+    if (Array.isArray(parsed.customers) && parsed.customers.length > 0) {
+      state.matcher = new CustomerMatcher(parsed.customers);
+      state.customerDbCount = parsed.customers.length;
+      state.customerDbName = parsed.name ?? "cached";
+      const when = new Date(parsed.loadedAt);
+      const daysAgo = Math.floor((Date.now() - when.getTime()) / 86400000);
+      customersInfo.textContent = `${parsed.customers.length} customers cached · ${daysAgo === 0 ? "today" : `${daysAgo}d ago`}`;
+      customersInfo.classList.remove("hidden");
+      dropCustomers.classList.add("has-file");
+    }
+  } catch {
+    // ignore
+  }
+}
+
+async function handleCustomersFile(file: File): Promise<void> {
+  customersInfo.textContent = `${file.name} — parsing…`;
+  customersInfo.classList.remove("hidden");
+  try {
+    const text = await file.text();
+    const customers = parseCustomerJson(text);
+    if (customers.length === 0) throw new Error("no valid customers found in file");
+    state.matcher = new CustomerMatcher(customers);
+    state.customerDbCount = customers.length;
+    state.customerDbName = file.name;
+    customersInfo.textContent = `${file.name} — ${customers.length} customers loaded`;
+    dropCustomers.classList.add("has-file");
+    localStorage.setItem(
+      CUSTOMERS_KEY,
+      JSON.stringify({ customers, loadedAt: new Date().toISOString(), name: file.name }),
+    );
+    if (state.txs.length > 0) {
+      applyMatching();
+      renderMatchStatus();
+    }
+  } catch (e) {
+    state.matcher = null;
+    customersInfo.textContent = `${file.name} — parse failed: ${(e as Error).message}`;
+    dropCustomers.classList.remove("has-file");
+  }
+}
+
+function applyMatching(): void {
+  if (!state.matcher) return;
+  const ownerName = readWalletFromForm().ownerName.trim().toLowerCase();
+  for (const tx of state.txs) {
+    if (
+      tx.counterpartyName &&
+      tx.counterpartyName.trim().toLowerCase() === ownerName
+    ) {
+      tx.matchedCustomer = undefined;
+      tx.matchConfidence = "none";
+      continue;
+    }
+    const result = state.matcher.match(tx.counterpartyName);
+    if (result.matched && result.customer) {
+      tx.matchedCustomer = result.customer;
+      tx.matchConfidence = result.confidence;
+    } else {
+      tx.matchedCustomer = undefined;
+      tx.matchConfidence = "none";
+    }
+  }
+}
+
+function renderMatchStatus(): void {
+  if (!state.matcher || state.txs.length === 0) {
+    matchStatusEl.classList.add("hidden");
+    return;
+  }
+  const seen = new Set<string>();
+  const rows: { name: string; iban?: string; matched: boolean; matchedName?: string; taxId?: string; conf?: string }[] = [];
+  for (const tx of state.txs) {
+    const key = (tx.counterpartyName || "").trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      name: tx.counterpartyName || "(no name)",
+      matched: !!tx.matchedCustomer,
+      matchedName: tx.matchedCustomer?.name,
+      taxId: tx.matchedCustomer?.taxNumber,
+      conf: tx.matchConfidence,
+    });
+  }
+  rows.sort((a, b) => Number(b.matched) - Number(a.matched) || a.name.localeCompare(b.name));
+  const matchedCount = rows.filter((r) => r.matched).length;
+  const html = `<div class="match-card">
+    <div class="match-card-head">
+      <span>Customer matching · ${escapeHtml(state.customerDbName ?? "")} (${state.customerDbCount})</span>
+      <span class="match-card-status">${matchedCount}/${rows.length} matched</span>
+    </div>
+    <div class="match-list">
+      ${rows
+        .map((r) => {
+          const cls = r.matched ? `matched ${r.conf ?? ""}` : "unmatched";
+          const icon = r.matched ? "✓" : "·";
+          const right = r.matched
+            ? `<span class="dst">→ ${escapeHtml(r.matchedName ?? "")} <code>${escapeHtml(r.taxId ?? "")}</code></span>`
+            : `<span class="dst">no match — manual in MiniMax</span>`;
+          const conf = r.matched && r.conf ? `<span class="conf">${escapeHtml(r.conf)}</span>` : `<span class="conf"></span>`;
+          return `<div class="match-row ${cls}">
+            <span class="icon">${icon}</span>
+            <span class="src">${escapeHtml(r.name)}</span>
+            ${right}
+            ${conf}
+          </div>`;
+        })
+        .join("")}
+    </div>
+  </div>`;
+  matchStatusEl.innerHTML = html;
+  matchStatusEl.classList.remove("hidden");
 }
 
 function currentWallet(): WalletConfig {
@@ -273,6 +423,10 @@ function parseAndPreview(): void {
   state.txs = txs;
   state.validation = validation;
 
+  if (state.matcher) {
+    applyMatching();
+  }
+
   renderSummary(validation);
   renderIssues(validation);
   renderDayTable(days);
@@ -280,6 +434,11 @@ function parseAndPreview(): void {
     runCrossCheck();
   } else {
     crossCheckEl.classList.add("hidden");
+  }
+  if (state.matcher) {
+    renderMatchStatus();
+  } else {
+    matchStatusEl.classList.add("hidden");
   }
   previewCard.classList.remove("hidden");
   actionCard.classList.remove("hidden");
