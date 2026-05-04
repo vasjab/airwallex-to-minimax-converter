@@ -1,0 +1,20 @@
+{
+  "name": "airwallex-to-minimax-converter",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Convert Airwallex CSV balance activity reports to ISO 20022 camt.053.001.02 XML for MiniMax import",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3"
+  }
+}

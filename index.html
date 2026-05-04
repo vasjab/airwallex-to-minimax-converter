@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Airwallex → MiniMax CAMT.053 Converter</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hdr">
+        <h1>Airwallex → MiniMax</h1>
+        <p class="sub">CSV Balance Activity Report → ISO 20022 camt.053.001.02 XML</p>
+      </header>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>1. Wallet settings</h2>
+          <button id="reset-wallet" class="link" type="button">Reset to default</button>
+        </div>
+        <p class="hint">Saved in your browser. Each currency has its own IBAN/BIC.</p>
+        <div class="grid">
+          <label>Currency<input id="f-ccy" type="text" maxlength="3" /></label>
+          <label>IBAN<input id="f-iban" type="text" /></label>
+          <label>BIC<input id="f-bic" type="text" /></label>
+          <label>Bank name<input id="f-bank" type="text" /></label>
+          <label>Owner name<input id="f-owner" type="text" /></label>
+          <label>Tax ID<input id="f-taxid" type="text" /></label>
+          <label>Country (ISO-2)<input id="f-ctry" type="text" maxlength="2" /></label>
+          <label>Address line 1<input id="f-addr1" type="text" /></label>
+          <label>Address line 2<input id="f-addr2" type="text" /></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>2. Mode</h2>
+        </div>
+        <label class="row">
+          <input id="f-perday" type="checkbox" checked />
+          <span>Generate one XML per booking day (default — recommended for MiniMax)</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>3. CSV</h2>
+        </div>
+        <label id="drop" class="drop">
+          <input id="f-file" type="file" accept=".csv,text/csv" hidden />
+          <span class="drop-title">Drop CSV here, or click to browse</span>
+          <span class="drop-sub">Airwallex Balance Activity Report (.csv)</span>
+        </label>
+        <div id="file-info" class="file-info hidden"></div>
+      </section>
+
+      <section id="preview-card" class="card hidden">
+        <div class="card-head">
+          <h2>4. Preview</h2>
+        </div>
+        <div id="summary" class="summary"></div>
+        <div id="issues" class="issues"></div>
+        <details>
+          <summary>Per-day breakdown</summary>
+          <div id="day-table"></div>
+        </details>
+      </section>
+
+      <section id="action-card" class="card hidden">
+        <button id="generate" class="primary" type="button">Generate &amp; download</button>
+        <p id="gen-status" class="hint"></p>
+      </section>
+
+      <footer class="ftr">
+        <p>
+          Files never leave your browser. Source:
+          <a href="https://github.com/vasjab/airwallex-to-minimax-converter" target="_blank" rel="noopener">GitHub</a>.
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
