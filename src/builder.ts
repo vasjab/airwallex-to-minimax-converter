@@ -13,16 +13,16 @@ export function buildXmls(transactions: Transaction[], opts: BuilderOptions): Bu
   const days = groupByDay(transactions);
   if (days.length === 0) return [];
   if (opts.perDay) {
-    return days.map((day) => buildSingle([day], opts.wallet, day.date));
+    return days.map((day) => buildSingle([day], opts.wallet));
   }
-  const periodKey = `${days[0].date}_to_${days[days.length - 1].date}`;
-  return [buildSingle(days, opts.wallet, periodKey)];
+  return [buildSingle(days, opts.wallet)];
 }
 
-function buildSingle(days: DailyStatement[], wallet: WalletConfig, label: string): BuiltXml {
+function buildSingle(days: DailyStatement[], wallet: WalletConfig): BuiltXml {
   const now = new Date();
   const creDtTm = isoLocal(now);
-  const msgId = `AWX-${wallet.iban}-${label}-${shortStamp(now)}`;
+  const firstYmd = days[0].date.replace(/-/g, "");
+  const msgId = truncate(`AWX${shortStamp(now)}${firstYmd}`, 35);
 
   const stmts = days.map((d) => stmtBlock(d, wallet, creDtTm)).join("");
 
@@ -33,11 +33,11 @@ function buildSingle(days: DailyStatement[], wallet: WalletConfig, label: string
       <MsgId>${esc(msgId)}</MsgId>
       <CreDtTm>${creDtTm}</CreDtTm>
       <MsgRcpt>
-        <Nm>${esc(wallet.ownerName)}</Nm>
+        <Nm>${esc(truncate(wallet.ownerName, 140))}</Nm>
         <Id>
           <OrgId>
             <Othr>
-              <Id>${esc(wallet.ownerTaxId)}</Id>
+              <Id>${esc(truncate(wallet.ownerTaxId, 35))}</Id>
             </Othr>
           </OrgId>
         </Id>
@@ -56,8 +56,8 @@ ${stmts}  </BkToCstmrStmt>
 }
 
 function stmtBlock(day: DailyStatement, wallet: WalletConfig, creDtTm: string): string {
-  const lglSeq = day.date.replace(/-/g, "");
-  const stmtId = `${wallet.iban}/${lglSeq}/${wallet.currency}`;
+  const lglSeq = String(dayOfYear(day.date));
+  const stmtId = truncate(`${wallet.iban}/${day.date.replace(/-/g, "")}/${wallet.currency}`, 35);
   const prevDate = previousDay(day.date);
 
   const totalSum = round2(day.totalCredits + day.totalDebits).toFixed(2);
@@ -72,7 +72,7 @@ function stmtBlock(day: DailyStatement, wallet: WalletConfig, creDtTm: string): 
         </Id>
         <Ccy>${esc(wallet.currency)}</Ccy>
         <Ownr>
-          <Nm>${esc(wallet.ownerName)}</Nm>
+          <Nm>${esc(truncate(wallet.ownerName, 140))}</Nm>
           <PstlAdr>
 ${addrLines(wallet)}          </PstlAdr>
         </Ownr>
@@ -143,7 +143,7 @@ function entryBlock(tx: Transaction, wallet: WalletConfig): string {
         <NtryDtls>
           <TxDtls>
             <Refs>
-              <EndToEndId>${esc(tx.externalRef || "NOTPROVIDED")}</EndToEndId>
+              <EndToEndId>${esc(truncate(tx.externalRef || "NOTPROVIDED", 35))}</EndToEndId>
               <TxId>${esc(txIdRef)}</TxId>
             </Refs>
             <RltdPties>
@@ -197,14 +197,14 @@ function partiesBlock(tx: Transaction, wallet: WalletConfig): string {
 }
 
 function ownerPartyXml(wallet: WalletConfig): { dbtr: string; cdtr: string } {
-  const inner = `                <Nm>${esc(wallet.ownerName)}</Nm>
+  const inner = `                <Nm>${esc(truncate(wallet.ownerName, 140))}</Nm>
                 <PstlAdr>
                   <Ctry>${esc(wallet.ownerCountry)}</Ctry>
 ${ownerAddrLines(wallet)}                </PstlAdr>
                 <Id>
                   <OrgId>
                     <Othr>
-                      <Id>${esc(wallet.ownerTaxId)}</Id>
+                      <Id>${esc(truncate(wallet.ownerTaxId, 35))}</Id>
                       <SchmeNm>
                         <Cd>TXID</Cd>
                       </SchmeNm>
@@ -293,16 +293,16 @@ function buildRemittanceText(tx: Transaction): string {
 
 function ownerAddrLines(wallet: WalletConfig): string {
   const lines: string[] = [];
-  if (wallet.ownerAddressLine1) lines.push(wallet.ownerAddressLine1);
-  if (wallet.ownerAddressLine2) lines.push(wallet.ownerAddressLine2);
+  if (wallet.ownerAddressLine1) lines.push(truncate(wallet.ownerAddressLine1, 70));
+  if (wallet.ownerAddressLine2) lines.push(truncate(wallet.ownerAddressLine2, 70));
   if (lines.length === 0) lines.push("NOTPROVIDED");
   return lines.map((l) => `                  <AdrLine>${esc(l)}</AdrLine>\n`).join("");
 }
 
 function addrLines(wallet: WalletConfig): string {
   const lines: string[] = [];
-  if (wallet.ownerAddressLine1) lines.push(wallet.ownerAddressLine1);
-  if (wallet.ownerAddressLine2) lines.push(wallet.ownerAddressLine2);
+  if (wallet.ownerAddressLine1) lines.push(truncate(wallet.ownerAddressLine1, 70));
+  if (wallet.ownerAddressLine2) lines.push(truncate(wallet.ownerAddressLine2, 70));
   if (lines.length === 0) lines.push("NOTPROVIDED");
   return lines.map((l) => `            <AdrLine>${esc(l)}</AdrLine>\n`).join("");
 }
@@ -347,6 +347,12 @@ function isoLocal(d: Date): string {
 
 function shortStamp(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function dayOfYear(dateStr: string): number {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.floor((d.getTime() - yearStart.getTime()) / 86400000) + 1;
 }
 
 function round2(n: number): number {
