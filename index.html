@@ -4,7 +4,315 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Airwallex → MiniMax CAMT.053 Converter</title>
-    <link rel="stylesheet" href="./src/styles.css" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --panel-2: #f1f3f6;
+        --border: #e3e6eb;
+        --border-strong: #cdd2da;
+        --text: #1a1f2b;
+        --text-soft: #4a5263;
+        --muted: #7b8597;
+        --brand: #5b6cff;
+        --brand-hover: #4858f0;
+        --brand-soft: rgba(91, 108, 255, 0.08);
+        --ok: #1aa86b;
+        --ok-soft: rgba(26, 168, 107, 0.1);
+        --warn: #c8861a;
+        --warn-soft: rgba(200, 134, 26, 0.12);
+        --err: #d83a3a;
+        --err-soft: rgba(216, 58, 58, 0.1);
+        --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+        --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
+        --radius-sm: 6px;
+        --radius: 10px;
+        --radius-lg: 14px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0c0e13;
+          --panel: #14171d;
+          --panel-2: #1b1f27;
+          --border: #262b35;
+          --border-strong: #353b48;
+          --text: #ecf0f6;
+          --text-soft: #c0c7d4;
+          --muted: #8b95a6;
+          --brand: #7588ff;
+          --brand-hover: #94a3ff;
+          --brand-soft: rgba(117, 136, 255, 0.14);
+          --ok: #46d28a;
+          --ok-soft: rgba(70, 210, 138, 0.14);
+          --warn: #f3c059;
+          --warn-soft: rgba(243, 192, 89, 0.14);
+          --err: #ff6c6c;
+          --err-soft: rgba(255, 108, 108, 0.14);
+          --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+          --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      a { color: var(--brand); text-decoration: none; font-weight: 500; }
+      a:hover { color: var(--brand-hover); text-decoration: underline; }
+      .page { max-width: 880px; margin: 0 auto; padding: 40px 24px 96px; }
+      .hdr { margin-bottom: 32px; }
+      .hdr h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        background: linear-gradient(135deg, var(--brand) 0%, #9b6cff 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        display: inline-block;
+      }
+      .hdr .sub { margin: 0; color: var(--muted); font-size: 14px; }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 22px 24px;
+        margin-bottom: 18px;
+        box-shadow: var(--shadow-sm);
+      }
+      .card.hidden { display: none; }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .card h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--text);
+      }
+      .hint { color: var(--muted); margin: 0 0 14px; font-size: 13px; }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px 16px;
+      }
+      .grid label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-soft);
+        letter-spacing: 0.01em;
+      }
+      .grid input, .grid select {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: var(--radius-sm);
+        padding: 9px 11px;
+        font: inherit;
+        font-size: 13px;
+        transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+      }
+      .grid input:hover { border-color: var(--border-strong); }
+      .grid input:focus {
+        outline: none;
+        border-color: var(--brand);
+        background: var(--panel);
+        box-shadow: 0 0 0 3px var(--brand-soft);
+      }
+      .row { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+      .row input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--brand);
+        cursor: pointer;
+      }
+      .drop {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 2px dashed var(--border-strong);
+        border-radius: var(--radius);
+        padding: 44px 20px;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s, transform 0.05s;
+        text-align: center;
+        background: var(--panel-2);
+      }
+      .drop:hover { border-color: var(--brand); background: var(--brand-soft); }
+      .drop:active { transform: scale(0.998); }
+      .drop.dragover { border-color: var(--brand); background: var(--brand-soft); }
+      .drop-title { font-weight: 600; font-size: 15px; color: var(--text); }
+      .drop-sub { color: var(--muted); font-size: 13px; }
+      .file-info {
+        margin-top: 14px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 10px 14px;
+        font-size: 13px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        color: var(--text-soft);
+      }
+      .file-info.hidden { display: none; }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .kpi {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .kpi .k {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 600;
+      }
+      .kpi .v {
+        font-size: 18px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+        letter-spacing: -0.01em;
+      }
+      .kpi.ok { background: var(--ok-soft); border-color: rgba(70, 210, 138, 0.3); }
+      .kpi.ok .v { color: var(--ok); }
+      .kpi.err { background: var(--err-soft); border-color: rgba(255, 108, 108, 0.35); }
+      .kpi.err .v { color: var(--err); }
+      .issues { margin: 14px 0 4px; display: flex; flex-direction: column; gap: 8px; }
+      .issue {
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        line-height: 1.5;
+        border: 1px solid transparent;
+      }
+      .issue small { color: var(--muted); }
+      .issue.error {
+        background: var(--err-soft);
+        border-color: rgba(216, 58, 58, 0.35);
+        color: var(--err);
+      }
+      .issue.warning {
+        background: var(--warn-soft);
+        border-color: rgba(200, 134, 26, 0.35);
+        color: var(--warn);
+      }
+      .issue.info {
+        background: var(--brand-soft);
+        border-color: rgba(91, 108, 255, 0.3);
+        color: var(--text);
+      }
+      details { margin-top: 12px; }
+      details summary {
+        cursor: pointer;
+        color: var(--text-soft);
+        font-size: 13px;
+        padding: 6px 0;
+        user-select: none;
+        list-style: none;
+      }
+      details summary::-webkit-details-marker { display: none; }
+      details summary::before {
+        content: "▸";
+        display: inline-block;
+        margin-right: 6px;
+        transition: transform 0.15s;
+        color: var(--muted);
+      }
+      details[open] summary::before { transform: rotate(90deg); }
+      details summary:hover { color: var(--text); }
+      #day-table {
+        margin-top: 12px;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+      }
+      #day-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      #day-table th, #day-table td {
+        padding: 8px 12px;
+        text-align: right;
+        border-bottom: 1px solid var(--border);
+        font-variant-numeric: tabular-nums;
+      }
+      #day-table tr:last-child td { border-bottom: 0; }
+      #day-table th:first-child, #day-table td:first-child { text-align: left; }
+      #day-table thead th {
+        color: var(--muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        background: var(--panel-2);
+      }
+      .primary {
+        background: var(--brand);
+        color: #fff;
+        border: 0;
+        border-radius: var(--radius-sm);
+        padding: 11px 22px;
+        font: inherit;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.05s, box-shadow 0.15s;
+        box-shadow: 0 1px 2px rgba(91, 108, 255, 0.25);
+      }
+      .primary:hover { background: var(--brand-hover); box-shadow: 0 4px 12px rgba(91, 108, 255, 0.3); }
+      .primary:active { transform: translateY(1px); }
+      .primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+      .link {
+        background: transparent;
+        color: var(--brand);
+        border: 0;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 0;
+      }
+      .link:hover { color: var(--brand-hover); text-decoration: underline; }
+      #gen-status { margin: 12px 0 0; }
+      .ftr {
+        margin-top: 40px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .ftr p { margin: 0; }
+      @media (max-width: 640px) {
+        .page { padding: 24px 16px 64px; }
+        .grid { grid-template-columns: 1fr; }
+        .summary { grid-template-columns: 1fr 1fr; }
+        .hdr h1 { font-size: 24px; }
+        .card { padding: 18px 18px; }
+      }
+    </style>
   </head>
   <body>
     <main class="page">
