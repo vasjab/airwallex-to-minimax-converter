@@ -6,6 +6,8 @@ const { parseCsv, rowsToTransactions } = await import("../src/parser.ts");
 const { groupByDay } = await import("../src/grouper.ts");
 const { validate } = await import("../src/validator.ts");
 const { buildXmls } = await import("../src/builder.ts");
+const { summarize } = await import("../src/pdf-parser.ts");
+const { crossCheckPdf } = await import("../src/cross-check.ts");
 
 const CSV_PATH = "/Users/vbocko/Downloads/Balance_Activity_Report_2026-04-30 (1).csv";
 const csv = readFileSync(CSV_PATH, "utf8");
@@ -63,4 +65,35 @@ console.log(`  endBal  ${v.endBalance.toFixed(2)} vs PDF ${expectedEnd.toFixed(2
 console.log(`\nSample transaction parses:`);
 for (const tx of txs.slice(0, 5)) {
   console.log(`  ${tx.bookingDate} ${tx.direction} ${tx.amount.toFixed(2)} | name="${tx.counterpartyName}" iban="${tx.counterpartyIban}" extRef="${tx.externalRef}" intRef="${tx.internalRef}"`);
+}
+
+// Test PDF parsing using the static text we know is in the April PDF
+console.log(`\n=== PDF cross-check ===`);
+const knownPdfText = `
+Account Holder
+Alpine Nation d.o.o.
+Gabrsckova ulica 24, Ljubljana, OSREDNJESLOVENSKA
+1000, SI
+Account Details
+IBAN: NL71AINH2467531516
+Airwallex (Netherlands) B.V.
+EUR Account Summary
+Starting balance on Apr 01 20260.00 EURMinimum balance0.00 EUR
+Total deposits and other additions30,000.00 EURMaximum balance15,393.52 EUR
+Total payouts and other subtractions16,998.33 EUR
+Ending balance on Apr 30 202613,001.67 EUR
+EUR Account Activity Apr 01 2026 to Apr 30 2026
+`;
+const pdfSummary = summarize(knownPdfText, "Account_Statement_EUR_2026-04-01-2026-04-30.pdf");
+console.log("Extracted from PDF:");
+for (const [k, v] of Object.entries(pdfSummary)) {
+  console.log(`  ${k}: ${typeof v === "number" ? v.toFixed(2) : v}`);
+}
+
+console.log("\nCross-check:");
+const cc = crossCheckPdf(pdfSummary, v, wallet);
+console.log(`  Result: ${cc.ok ? "OK" : "MISMATCH"}`);
+for (const r of cc.rows) {
+  const sym = r.level === "match" ? "✓" : r.level === "mismatch" ? "✗" : "·";
+  console.log(`  ${sym} ${r.field}: PDF=${r.pdf ?? "-"} | CSV=${r.csv ?? "-"}${r.note ? ` (${r.note})` : ""}`);
 }

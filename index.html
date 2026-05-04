@@ -171,6 +171,58 @@
         color: var(--text-soft);
       }
       .file-info.hidden { display: none; }
+      .drop.drop-secondary { padding: 28px 18px; margin-top: 14px; }
+      .drop.drop-secondary .drop-title { font-size: 14px; }
+      .drop.drop-secondary.has-file { border-color: var(--ok); background: var(--ok-soft); }
+      .crosscheck {
+        margin: 14px 0 4px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+      .crosscheck-head {
+        background: var(--panel-2);
+        padding: 10px 14px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .crosscheck-status { font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+      .crosscheck-status.ok { color: var(--ok); }
+      .crosscheck-status.err { color: var(--err); }
+      .crosscheck table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .crosscheck th, .crosscheck td {
+        padding: 8px 14px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      .crosscheck tr:last-child td { border-bottom: 0; }
+      .crosscheck thead th {
+        color: var(--muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        background: var(--panel-2);
+      }
+      .crosscheck td.amt { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+      .crosscheck td.icon { width: 1.2em; text-align: center; font-weight: 600; }
+      .crosscheck tr.match td.icon { color: var(--ok); }
+      .crosscheck tr.mismatch td.icon { color: var(--err); }
+      .crosscheck tr.mismatch { background: var(--err-soft); }
+      .crosscheck tr.info td.icon { color: var(--muted); }
+      .crosscheck .note {
+        display: block;
+        margin-top: 2px;
+        font-size: 12px;
+        color: var(--muted);
+      }
       .summary {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -352,14 +404,21 @@
 
       <section class="card">
         <div class="card-head">
-          <h2>3. CSV</h2>
+          <h2>3. Files</h2>
         </div>
+        <p class="hint">CSV is required. PDF is optional — when included, totals are cross-checked automatically.</p>
         <label id="drop" class="drop">
           <input id="f-file" type="file" accept=".csv,text/csv" hidden />
           <span class="drop-title">Drop CSV here, or click to browse</span>
           <span class="drop-sub">Airwallex Balance Activity Report (.csv)</span>
         </label>
         <div id="file-info" class="file-info hidden"></div>
+        <label id="drop-pdf" class="drop drop-secondary">
+          <input id="f-pdf" type="file" accept=".pdf,application/pdf" hidden />
+          <span class="drop-title">Optional: drop PDF for cross-check</span>
+          <span class="drop-sub">Airwallex Account Statement (.pdf)</span>
+        </label>
+        <div id="pdf-info" class="file-info hidden"></div>
       </section>
 
       <section id="preview-card" class="card hidden">
@@ -368,6 +427,7 @@
         </div>
         <div id="summary" class="summary"></div>
         <div id="issues" class="issues"></div>
+        <div id="crosscheck" class="hidden"></div>
         <details>
           <summary>Per-day breakdown</summary>
           <div id="day-table"></div>

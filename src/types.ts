@@ -72,3 +72,36 @@ export interface BuilderOptions {
   perDay: boolean;
   wallet: WalletConfig;
 }
+
+export interface PdfSummary {
+  filename?: string;
+  iban?: string;
+  ownerName?: string;
+  currency?: string;
+  startingBalance?: number;
+  endingBalance?: number;
+  totalDeposits?: number;
+  totalPayouts?: number;
+  minBalance?: number;
+  maxBalance?: number;
+  periodStart?: string;
+  periodEnd?: string;
+  rawTextLength: number;
+  fieldsFound: number;
+}
+
+export type CrossCheckLevel = "match" | "mismatch" | "info";
+
+export interface CrossCheckRow {
+  field: string;
+  pdf?: string;
+  csv?: string;
+  level: CrossCheckLevel;
+  note?: string;
+}
+
+export interface CrossCheckResult {
+  ok: boolean;
+  rows: CrossCheckRow[];
+  summary: PdfSummary;
+}

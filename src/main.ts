@@ -3,6 +3,8 @@ import { parseCsv, rowsToTransactions } from "./parser";
 import { groupByDay } from "./grouper";
 import { validate } from "./validator";
 import { buildXmls } from "./builder";
+import { parseAirwallexPdf } from "./pdf-parser";
+import { crossCheckPdf } from "./cross-check";
 import {
   loadWallets,
   saveWallets,
@@ -10,13 +12,21 @@ import {
   savePrefs,
   defaultWalletForCurrency,
 } from "./settings";
-import type { Transaction, ValidationResult, WalletConfig } from "./types";
+import type {
+  CrossCheckResult,
+  PdfSummary,
+  Transaction,
+  ValidationResult,
+  WalletConfig,
+} from "./types";
 
 interface AppState {
   csv: { name: string; text: string } | null;
   txs: Transaction[];
   validation: ValidationResult | null;
   detectedCurrency: string;
+  pdf: PdfSummary | null;
+  crossCheck: CrossCheckResult | null;
 }
 
 const state: AppState = {
@@ -24,6 +34,8 @@ const state: AppState = {
   txs: [],
   validation: null,
   detectedCurrency: "EUR",
+  pdf: null,
+  crossCheck: null,
 };
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -40,14 +52,18 @@ const fields = {
   addr2: $<HTMLInputElement>("f-addr2"),
   perDay: $<HTMLInputElement>("f-perday"),
   file: $<HTMLInputElement>("f-file"),
+  pdf: $<HTMLInputElement>("f-pdf"),
 };
 
 const drop = $<HTMLLabelElement>("drop");
+const dropPdf = $<HTMLLabelElement>("drop-pdf");
 const fileInfo = $<HTMLDivElement>("file-info");
+const pdfInfo = $<HTMLDivElement>("pdf-info");
 const previewCard = $<HTMLDivElement>("preview-card");
 const actionCard = $<HTMLDivElement>("action-card");
 const summary = $<HTMLDivElement>("summary");
 const issuesEl = $<HTMLDivElement>("issues");
+const crossCheckEl = $<HTMLDivElement>("crosscheck");
 const dayTable = $<HTMLDivElement>("day-table");
 const generateBtn = $<HTMLButtonElement>("generate");
 const genStatus = $<HTMLParagraphElement>("gen-status");
@@ -74,7 +90,11 @@ function init(): void {
 
   fields.file.addEventListener("change", () => {
     const f = fields.file.files?.[0];
-    if (f) handleFile(f);
+    if (f) handleCsvFile(f);
+  });
+  fields.pdf.addEventListener("change", () => {
+    const f = fields.pdf.files?.[0];
+    if (f) void handlePdfFile(f);
   });
 
   drop.addEventListener("dragover", (e) => {
@@ -86,7 +106,19 @@ function init(): void {
     e.preventDefault();
     drop.classList.remove("dragover");
     const f = e.dataTransfer?.files?.[0];
-    if (f) handleFile(f);
+    if (f) handleCsvFile(f);
+  });
+
+  dropPdf.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropPdf.classList.add("dragover");
+  });
+  dropPdf.addEventListener("dragleave", () => dropPdf.classList.remove("dragover"));
+  dropPdf.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropPdf.classList.remove("dragover");
+    const f = e.dataTransfer?.files?.[0];
+    if (f) void handlePdfFile(f);
   });
 
   generateBtn.addEventListener("click", () => {
@@ -134,7 +166,7 @@ function saveCurrentWallet(): void {
   saveWallets(wallets);
 }
 
-async function handleFile(file: File): Promise<void> {
+async function handleCsvFile(file: File): Promise<void> {
   fileInfo.textContent = `${file.name} — ${(file.size / 1024).toFixed(1)} KB`;
   fileInfo.classList.remove("hidden");
   let text: string;
@@ -146,6 +178,69 @@ async function handleFile(file: File): Promise<void> {
   }
   state.csv = { name: file.name, text };
   parseAndPreview();
+}
+
+async function handlePdfFile(file: File): Promise<void> {
+  pdfInfo.textContent = `${file.name} — ${(file.size / 1024).toFixed(1)} KB · parsing…`;
+  pdfInfo.classList.remove("hidden");
+  dropPdf.classList.remove("has-file");
+  try {
+    const summary = await parseAirwallexPdf(file);
+    state.pdf = summary;
+    pdfInfo.textContent = `${file.name} — ${summary.fieldsFound} fields extracted`;
+    dropPdf.classList.add("has-file");
+    if (state.validation) {
+      runCrossCheck();
+    }
+  } catch (e) {
+    state.pdf = null;
+    state.crossCheck = null;
+    pdfInfo.textContent = `${file.name} — parse failed: ${(e as Error).message}`;
+    crossCheckEl.classList.add("hidden");
+  }
+}
+
+function runCrossCheck(): void {
+  if (!state.pdf || !state.validation) return;
+  const wallet = readWalletFromForm();
+  state.crossCheck = crossCheckPdf(state.pdf, state.validation, wallet);
+  renderCrossCheck();
+}
+
+function renderCrossCheck(): void {
+  if (!state.crossCheck) {
+    crossCheckEl.classList.add("hidden");
+    return;
+  }
+  const cc = state.crossCheck;
+  const filename = cc.summary.filename ?? "PDF";
+  const status = cc.ok ? "All match" : "Mismatch";
+  const statusClass = cc.ok ? "ok" : "err";
+  const rows = cc.rows
+    .map((r) => {
+      const icon = r.level === "match" ? "✓" : r.level === "mismatch" ? "✗" : "·";
+      const note = r.note ? `<span class="note">${escapeHtml(r.note)}</span>` : "";
+      return `<tr class="${r.level}">
+        <td class="icon">${icon}</td>
+        <td>${escapeHtml(r.field)}${note}</td>
+        <td class="amt">${escapeHtml(r.pdf ?? "")}</td>
+        <td class="amt">${escapeHtml(r.csv ?? "")}</td>
+      </tr>`;
+    })
+    .join("");
+  crossCheckEl.innerHTML = `<div class="crosscheck">
+    <div class="crosscheck-head">
+      <span>PDF cross-check · ${escapeHtml(filename)}</span>
+      <span class="crosscheck-status ${statusClass}">${status}</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th></th><th>Field</th><th class="amt">PDF</th><th class="amt">CSV / wallet</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+  crossCheckEl.classList.remove("hidden");
 }
 
 function parseAndPreview(): void {
@@ -181,6 +276,11 @@ function parseAndPreview(): void {
   renderSummary(validation);
   renderIssues(validation);
   renderDayTable(days);
+  if (state.pdf) {
+    runCrossCheck();
+  } else {
+    crossCheckEl.classList.add("hidden");
+  }
   previewCard.classList.remove("hidden");
   actionCard.classList.remove("hidden");
   genStatus.textContent = "";
