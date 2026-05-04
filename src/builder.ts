@@ -295,7 +295,10 @@ function siWrapRef(ref: string): string {
   if (/^SI\d{2}/.test(t) || /^RF\d{2}/.test(t)) {
     return truncate(t, 35);
   }
-  const wrapped = `SI99${t}`;
+  // MiniMax strips "SI" + 2-digit model + 2-char "checksum" from <Ref>.
+  // Wrap with "SI9900" so 6 chars get stripped, leaving the original ref intact.
+  // Without the "00" pad, numeric refs like "209134013" lose 2 leading digits.
+  const wrapped = `SI9900${t}`;
   return wrapped.length <= 35 ? wrapped : wrapped.slice(0, 35);
 }
 
