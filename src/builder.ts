@@ -263,22 +263,18 @@ ${ownerAgent}              </CdtrAgt>
 
 function rmtInfBlock(tx: Transaction): string {
   const desc = buildRemittanceText(tx);
+  const ustrd = `              <Ustrd>${esc(truncate(desc, 140))}</Ustrd>
+`;
   if (tx.externalRef) {
-    return `              <Strd>
+    const strd = `              <Strd>
                 <CdtrRefInf>
-                  <Tp>
-                    <CdOrPrtry>
-                      <Cd>SCOR</Cd>
-                    </CdOrPrtry>
-                  </Tp>
                   <Ref>${esc(truncate(tx.externalRef, 35))}</Ref>
                 </CdtrRefInf>
-                <AddtlRmtInf>${esc(truncate(desc, 140))}</AddtlRmtInf>
               </Strd>
 `;
+    return ustrd + strd;
   }
-  return `              <Ustrd>${esc(truncate(desc, 140))}</Ustrd>
-`;
+  return ustrd;
 }
 
 function buildRemittanceText(tx: Transaction): string {
