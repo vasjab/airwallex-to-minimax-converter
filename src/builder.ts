@@ -268,13 +268,22 @@ function rmtInfBlock(tx: Transaction): string {
   if (tx.externalRef) {
     const strd = `              <Strd>
                 <CdtrRefInf>
-                  <Ref>${esc(truncate(tx.externalRef, 35))}</Ref>
+                  <Ref>${esc(siWrapRef(tx.externalRef))}</Ref>
                 </CdtrRefInf>
               </Strd>
 `;
     return ustrd + strd;
   }
   return ustrd;
+}
+
+function siWrapRef(ref: string): string {
+  const t = ref.trim();
+  if (/^SI\d{2}/.test(t) || /^RF\d{2}/.test(t)) {
+    return truncate(t, 35);
+  }
+  const wrapped = `SI99${t}`;
+  return wrapped.length <= 35 ? wrapped : wrapped.slice(0, 35);
 }
 
 function buildRemittanceText(tx: Transaction): string {
