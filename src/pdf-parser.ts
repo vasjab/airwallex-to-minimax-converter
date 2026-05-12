@@ -41,7 +41,10 @@ export async function parseAirwallexPdf(file: File): Promise<PdfSummary> {
 export function summarize(text: string, filename?: string): PdfSummary {
   const norm = text.replace(/\s+/g, " ");
 
-  const ibanMatch = norm.match(/IBAN:\s*([A-Z]{2}[A-Z0-9]{12,30})/);
+  const ibanBankMatch = norm.match(
+    /IBAN:\s*([A-Z]{2}[A-Z0-9]{12,30})\s+(.+?)\s+([A-Z]{3})\s+Account\s+Summary/,
+  );
+  const ibanMatch = ibanBankMatch ?? norm.match(/IBAN:\s*([A-Z]{2}[A-Z0-9]{12,30})/);
   const startMatch = norm.match(
     /Starting balance on ([A-Z][a-z]+ \d{1,2} \d{4})\s*([\d,]+\.\d{2})\s*([A-Z]{3})/,
   );
@@ -68,6 +71,11 @@ export function summarize(text: string, filename?: string): PdfSummary {
 
   if (ibanMatch) {
     summary.iban = ibanMatch[1];
+    summary.fieldsFound += 1;
+  }
+  if (ibanBankMatch) {
+    summary.bankName = ibanBankMatch[2].trim();
+    summary.currency = summary.currency || ibanBankMatch[3];
     summary.fieldsFound += 1;
   }
   if (ccyHeader) {

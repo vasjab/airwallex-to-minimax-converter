@@ -45,8 +45,16 @@ npx tsx scripts/smoke-test.mjs   # end-to-end on a real CSV (edit the path insid
 
 Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds and publishes to GitHub Pages. Enable Pages in the repo's Settings → Pages → Source: "GitHub Actions".
 
+## Multi-wallet CSVs
+
+If your Airwallex CSV contains several wallets (e.g. EUR + USD + CAD in one export), the tool splits them by `Wallet Currency` and validates each independently. Settings are remembered per currency, and the wallet picker in the settings card lets you switch which one you're editing.
+
+The fastest way to configure: export Airwallex's **Account Statement** report (gives you one PDF per wallet, usually delivered as a ZIP). Drop the whole ZIP onto the PDF dropzone — the tool unpacks it, parses each PDF, auto-fills the IBAN and partner bank name for every wallet, and cross-checks each currency's totals against the matching section of the CSV. You only need to enter BIC manually (PDFs don't include it).
+
+Generate produces a ZIP with per-IBAN, per-day XMLs across all wallets. Each XML maps to a separate bank account in MiniMax.
+
 ## Caveats
 
 - Built specifically against MiniMax's tolerance for the camt.053.001.02 dialect used by Slovenian banks (Banka Sparkasse format). Other ERPs may want different fields.
 - Counterparty IBAN/BIC is omitted when not present in the description (most payouts).
-- Currency conversion entries (FX) are not currently handled — export one currency wallet at a time.
+- One wallet per currency is assumed. If you have two Airwallex wallets in the same currency, export them separately.

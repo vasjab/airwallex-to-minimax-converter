@@ -95,6 +95,127 @@
         gap: 12px;
         margin-bottom: 14px;
       }
+      .subhead {
+        margin: 18px 0 10px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+      .subhead-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 18px 0 10px;
+      }
+      .subhead-row .subhead { margin: 0; }
+      .add-wallet {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .add-wallet input {
+        width: 64px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: var(--radius-sm);
+        padding: 5px 8px;
+        font: inherit;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+      .add-wallet input:focus {
+        outline: none;
+        border-color: var(--brand);
+        box-shadow: 0 0 0 3px var(--brand-soft);
+      }
+      .wallet-card {
+        margin-bottom: 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--panel-2);
+        padding: 12px 14px;
+      }
+      .wallet-card:last-child { margin-bottom: 0; }
+      .wallet-card-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .wallet-card-head .ccy {
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: 0.02em;
+        color: var(--text);
+      }
+      .wallet-card-head .tag {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+      .wallet-card-head .tag.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+      .wallet-card-head .tag.ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      .wallet-card-head .spacer { flex: 1; }
+      .wallet-card-head .link { font-size: 12px; }
+      .wallet-card .grid {
+        gap: 10px 12px;
+      }
+      .wallet-card .grid input {
+        background: var(--panel);
+      }
+      .wallet-section {
+        margin-bottom: 20px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+      .wallet-section:last-child { margin-bottom: 0; }
+      .wallet-section-head {
+        background: var(--panel-2);
+        padding: 10px 14px;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .wallet-section-head .title {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text);
+      }
+      .wallet-section-head .meta {
+        color: var(--muted);
+        font-size: 12px;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      }
+      .wallet-section-head .status {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .wallet-section-head .status.ok { color: var(--ok); }
+      .wallet-section-head .status.err { color: var(--err); }
+      .wallet-section-head .status.warn { color: var(--warn); }
+      .wallet-section-body { padding: 14px; }
+      .wallet-section-body .summary { margin-bottom: 12px; }
+      .wallet-section-body .issues { margin-top: 12px; }
+      .wallet-section-body details summary { padding: 8px 0 4px; }
       .card h2 {
         margin: 0;
         font-size: 15px;
@@ -347,22 +468,22 @@
       }
       details[open] summary::before { transform: rotate(90deg); }
       details summary:hover { color: var(--text); }
-      #day-table {
+      .day-table {
         margin-top: 12px;
         overflow-x: auto;
         border: 1px solid var(--border);
         border-radius: var(--radius-sm);
       }
-      #day-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
-      #day-table th, #day-table td {
+      .day-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .day-table th, .day-table td {
         padding: 8px 12px;
         text-align: right;
         border-bottom: 1px solid var(--border);
         font-variant-numeric: tabular-nums;
       }
-      #day-table tr:last-child td { border-bottom: 0; }
-      #day-table th:first-child, #day-table td:first-child { text-align: left; }
-      #day-table thead th {
+      .day-table tr:last-child td { border-bottom: 0; }
+      .day-table th:first-child, .day-table td:first-child { text-align: left; }
+      .day-table thead th {
         color: var(--muted);
         font-weight: 600;
         text-transform: uppercase;
@@ -424,20 +545,26 @@
       <section class="card">
         <div class="card-head">
           <h2>1. Wallet settings</h2>
-          <button id="reset-wallet" class="link" type="button">Reset to default</button>
         </div>
-        <p class="hint">Enter once. Auto-saved to your browser per currency — next time you upload a CSV, the matching wallet loads automatically.</p>
+        <p class="hint">Account holder is shared across all wallets. Each currency has its own bank account — auto-saved to your browser.</p>
+
+        <h3 class="subhead">Account holder</h3>
         <div class="grid">
-          <label>Currency<input id="f-ccy" type="text" maxlength="3" value="EUR" /></label>
-          <label>IBAN<input id="f-iban" type="text" value="NL71AINH2467531516" /></label>
-          <label>BIC<input id="f-bic" type="text" value="AIPBNL2AXXX" /></label>
-          <label>Bank name<input id="f-bank" type="text" value="Airwallex (Netherlands) B.V." /></label>
           <label>Owner name<input id="f-owner" type="text" value="Alpine Nation d.o.o." /></label>
           <label>Tax ID<input id="f-taxid" type="text" value="11414928" /></label>
           <label>Country (ISO-2)<input id="f-ctry" type="text" maxlength="2" value="SI" /></label>
           <label>Address line 1<input id="f-addr1" type="text" value="Gabrščkova ulica 24" /></label>
           <label>Address line 2<input id="f-addr2" type="text" value="1000 Ljubljana" /></label>
         </div>
+
+        <div class="subhead-row">
+          <h3 class="subhead">Bank accounts</h3>
+          <form id="add-wallet-form" class="add-wallet">
+            <input id="add-wallet-ccy" type="text" maxlength="3" placeholder="EUR" autocomplete="off" />
+            <button type="submit" class="link">+ Add wallet</button>
+          </form>
+        </div>
+        <div id="wallets-list"></div>
       </section>
 
       <section class="card">
@@ -462,9 +589,9 @@
         </label>
         <div id="file-info" class="file-info hidden"></div>
         <label id="drop-pdf" class="drop drop-secondary">
-          <input id="f-pdf" type="file" accept=".pdf,application/pdf" hidden />
-          <span class="drop-title">Optional: drop PDF for cross-check</span>
-          <span class="drop-sub">Airwallex Account Statement (.pdf)</span>
+          <input id="f-pdf" type="file" accept=".pdf,.zip,application/pdf,application/zip" hidden multiple />
+          <span class="drop-title">Optional: drop Account Statement PDFs (or ZIP)</span>
+          <span class="drop-sub">Airwallex Account Statement — one per currency. Auto-fills wallet IBAN & bank.</span>
         </label>
         <div id="pdf-info" class="file-info hidden"></div>
         <label id="drop-customers" class="drop drop-secondary">
@@ -479,14 +606,9 @@
         <div class="card-head">
           <h2>4. Preview</h2>
         </div>
-        <div id="summary" class="summary"></div>
-        <div id="issues" class="issues"></div>
+        <div id="sections"></div>
         <div id="crosscheck" class="hidden"></div>
         <div id="match-status" class="hidden"></div>
-        <details>
-          <summary>Per-day breakdown</summary>
-          <div id="day-table"></div>
-        </details>
       </section>
 
       <section id="action-card" class="card hidden">

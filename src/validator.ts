@@ -67,14 +67,6 @@ export function validate(txs: Transaction[], days: DailyStatement[]): Validation
     });
   }
 
-  const currencies = new Set(txs.map((t) => t.currency).filter(Boolean));
-  if (currencies.size > 1) {
-    issues.push({
-      level: "error",
-      message: `Multiple currencies in one CSV: ${[...currencies].join(", ")}. Export one wallet at a time.`,
-    });
-  }
-
   return {
     ok: issues.filter((i) => i.level === "error").length === 0,
     issues,

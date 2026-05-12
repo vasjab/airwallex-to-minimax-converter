@@ -78,6 +78,7 @@ export interface BuilderOptions {
 export interface PdfSummary {
   filename?: string;
   iban?: string;
+  bankName?: string;
   ownerName?: string;
   currency?: string;
   startingBalance?: number;
@@ -129,4 +130,11 @@ export interface MatchResult {
 export interface CustomerDb {
   customers: CustomerRecord[];
   loadedAt: string;
+}
+
+export interface WalletSection {
+  currency: string;
+  txs: Transaction[];
+  days: DailyStatement[];
+  validation: ValidationResult;
 }
