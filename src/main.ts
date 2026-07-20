@@ -579,11 +579,19 @@ function runCrossCheck(): void {
     return;
   }
   const results: { currency: string; result: CrossCheckResult }[] = [];
+  // How far the export reaches is a property of the file, not of one wallet.
+  const allDates = allTxs().map((t) => t.bookingDate).filter(Boolean).sort();
+  const csvSpan = allDates.length
+    ? { first: allDates[0], last: allDates[allDates.length - 1] }
+    : undefined;
   for (const [ccy, summary] of state.pdfs) {
     const section = state.sections.find((s) => s.currency === ccy);
     if (!section) continue;
     const wallet = walletForCurrency(ccy);
-    results.push({ currency: ccy, result: crossCheckPdf(summary, section.validation, wallet) });
+    results.push({
+      currency: ccy,
+      result: crossCheckPdf(summary, section.validation, wallet, section.txs, csvSpan),
+    });
   }
   state.crossChecks = results.sort((a, b) => a.currency.localeCompare(b.currency));
   renderCrossCheck();
