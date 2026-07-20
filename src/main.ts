@@ -5,6 +5,7 @@ import { splitByCurrency } from "./multi-wallet";
 import { parseAirwallexPdf } from "./pdf-parser";
 import { crossCheckPdf } from "./cross-check";
 import { CustomerMatcher, parseCustomerJson } from "./customer-matcher";
+import { parseCustomerXlsx } from "./customer-xlsx";
 import {
   loadWallets,
   saveWallets,
@@ -350,8 +351,13 @@ async function handleCustomersFile(file: File): Promise<void> {
   customersInfo.textContent = `${file.name} — parsing…`;
   customersInfo.classList.remove("hidden");
   try {
-    const text = await file.text();
-    const customers = parseCustomerJson(text);
+    // MiniMax exports customers as .xlsx; accept it as downloaded rather than
+    // making the user convert to JSON first.
+    const isXlsx = /\.xlsx$/i.test(file.name)
+      || file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const customers = isXlsx
+      ? await parseCustomerXlsx(await file.arrayBuffer())
+      : parseCustomerJson(await file.text());
     if (customers.length === 0) throw new Error("no valid customers found in file");
     state.matcher = new CustomerMatcher(customers);
     state.customerDbCount = customers.length;

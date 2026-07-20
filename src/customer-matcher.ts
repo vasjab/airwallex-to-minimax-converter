@@ -11,6 +11,20 @@ export function normalizeName(name: string): string {
     .trim();
 }
 
+/**
+ * Whether this record's tax number can go into <OrgId> as a TXID.
+ *
+ * MiniMax stores non-EU suppliers with the literal placeholder "tretja država"
+ * (and a run-together "tretjadržava"), which identifies the customer fine but
+ * is not an identifier. Requiring a digit rejects those without hard-coding
+ * the phrase — every real number we hold has one (11414928, IE3206488LH,
+ * NL005039900B16, EU372079631).
+ */
+export function hasUsableTaxNumber(c: CustomerRecord): boolean {
+  const t = (c.taxNumber ?? "").trim();
+  return /^[0-9A-Za-z][0-9A-Za-z-]*$/.test(t) && /\d/.test(t);
+}
+
 interface NormalizedCustomer {
   record: CustomerRecord;
   norm: string;
@@ -33,11 +47,19 @@ export class CustomerMatcher {
     if (!norm) return { matched: false, confidence: "none" };
     const queryWords = norm.split(" ").filter(Boolean);
 
-    let best: { record: CustomerRecord; score: number; confidence: "exact" | "prefix" | "fuzzy" } | null = null;
+    type Cand = { record: CustomerRecord; score: number; confidence: "exact" | "prefix" | "fuzzy" };
+    // Two ladders. MiniMax often holds the same party twice — the business
+    // ("Sandra Staniša s.p." with a tax number) and a bare-name duplicate from
+    // the webshop. The duplicate wins on raw score because the bank writes the
+    // short name, but it is the useless one: the tax number is what MiniMax
+    // links on. So a taxed record wins whenever one matches at all.
+    const cands: Cand[] = [];
+    const offer = (c: Cand) => cands.push(c);
 
     for (const entry of this.entries) {
       if (entry.norm === norm) {
-        return { matched: true, customer: entry.record, confidence: "exact", score: 100 };
+        offer({ record: entry.record, score: 100, confidence: "exact" });
+        continue;
       }
 
       // 4, not 5: short company names normalize below the old floor once the
@@ -49,7 +71,7 @@ export class CustomerMatcher {
           const ratio =
             Math.min(norm.length, entry.norm.length) / Math.max(norm.length, entry.norm.length);
           const score = Math.max(70, ratio * 95);
-          if (!best || score > best.score) best = { record: entry.record, score, confidence: "prefix" };
+          offer({ record: entry.record, score, confidence: "prefix" });
           continue;
         }
       }
@@ -65,7 +87,7 @@ export class CustomerMatcher {
           const hits = significant.filter((w) => longerSet.has(w)).length;
           if (hits === significant.length) {
             const score = 60 + Math.min(20, significant.length * 5);
-            if (!best || score > best.score) best = { record: entry.record, score, confidence: "fuzzy" };
+            offer({ record: entry.record, score, confidence: "fuzzy" });
             continue;
           }
         }
@@ -80,15 +102,17 @@ export class CustomerMatcher {
         }
         if (leadingMatch >= 2) {
           const score = (leadingMatch / Math.max(queryWords.length, entry.words.length)) * 80;
-          if (!best || score > best.score) best = { record: entry.record, score, confidence: "fuzzy" };
+          offer({ record: entry.record, score, confidence: "fuzzy" });
         }
       }
     }
 
-    if (best && best.score >= 50) {
-      return { matched: true, customer: best.record, confidence: best.confidence, score: best.score };
-    }
-    return { matched: false, confidence: "none" };
+    const viable = cands.filter((c) => c.score >= 50);
+    if (viable.length === 0) return { matched: false, confidence: "none" };
+    const taxed = viable.filter((c) => hasUsableTaxNumber(c.record));
+    const pool = taxed.length > 0 ? taxed : viable;
+    const pick = pool.reduce((a, b) => (b.score > a.score ? b : a));
+    return { matched: true, customer: pick.record, confidence: pick.confidence, score: pick.score };
   }
 }
 
@@ -106,9 +130,13 @@ export function parseCustomerJson(text: string): CustomerRecord[] {
       const country = (raw.country ?? (raw.Country as { Name?: string })?.Name) as string | undefined;
       const code = (raw.code ?? raw.Code) as string | null | undefined;
       const city = (raw.city ?? raw.City) as string | undefined;
-      if (!id || !name || !taxNumber) return null;
-      if (!/^[0-9A-Za-z][0-9A-Za-z-]*$/.test(taxNumber)) return null;
-      return { id, name, taxNumber, country, code, city };
+      // A missing or placeholder tax number no longer disqualifies a record.
+      // It still can't be emitted as a TXID (hasUsableTaxNumber gates that),
+      // but the name alone is worth having: it fixes the spelling MiniMax
+      // shows and covers refunds to individuals and non-EU suppliers, none of
+      // which carry a tax number.
+      if (!id || !name) return null;
+      return { id, name, taxNumber: (taxNumber ?? "").trim(), country, code, city };
     })
     .filter((x: CustomerRecord | null): x is CustomerRecord => x !== null);
 }

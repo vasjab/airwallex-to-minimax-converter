@@ -1,5 +1,6 @@
 import type { BuilderOptions, DailyStatement, Transaction, WalletConfig } from "./types";
 import { groupByDay } from "./grouper";
+import { hasUsableTaxNumber } from "./customer-matcher";
 
 const NS = "urn:iso:std:iso:20022:tech:xsd:camt.053.001.02";
 
@@ -233,7 +234,10 @@ function counterpartyPartyXml(
     || (sameAsOwner(tx, wallet)
       ? wallet.ownerCountry
       : (inferCountry(tx.counterpartyIban) || wallet.ownerCountry));
-  const idBlock = matched
+  // Matching a customer no longer implies a usable identifier: records for
+  // individuals and non-EU suppliers carry no tax number, or the "tretja
+  // država" placeholder. Their name is still worth emitting; a TXID is not.
+  const idBlock = matched && hasUsableTaxNumber(matched)
     ? `                <Id>
                   <OrgId>
                     <Othr>
