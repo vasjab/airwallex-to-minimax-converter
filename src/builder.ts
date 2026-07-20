@@ -149,7 +149,7 @@ function entryBlock(tx: Transaction, wallet: WalletConfig): string {
             <RltdPties>
 ${partiesBlock(tx, wallet)}            </RltdPties>
 ${agentsBlock(tx, wallet)}            <Purp>
-              <Cd>OTHR</Cd>
+              <Cd>${esc(purposeCode(tx, wallet))}</Cd>
             </Purp>
             <RmtInf>
 ${rmtInfBlock(tx)}            </RmtInf>
@@ -229,9 +229,10 @@ function counterpartyPartyXml(
 ): string {
   const matched = tx.matchedCustomer;
   const name = matched?.name || tx.counterpartyName || tx.description.slice(0, 70) || "UNKNOWN";
-  const sameAsOwner = tx.counterpartyName.trim().toLowerCase() === wallet.ownerName.trim().toLowerCase();
   const ctry = matched?.country
-    || (sameAsOwner ? wallet.ownerCountry : (inferCountry(tx.counterpartyIban) || wallet.ownerCountry));
+    || (sameAsOwner(tx, wallet)
+      ? wallet.ownerCountry
+      : (inferCountry(tx.counterpartyIban) || wallet.ownerCountry));
   const idBlock = matched
     ? `                <Id>
                   <OrgId>
@@ -274,6 +275,43 @@ ${ownerAgent}              </CdtrAgt>
 `;
 }
 
+/**
+ * SEPA purpose code, from MiniMax's own list (175 codes). We used to send OTHR
+ * ("Drugo") for every entry, which throws away the one classification signal we
+ * already know for free — the Airwallex financial transaction type.
+ *
+ * Deliberately left alone: <BkTxCd><Prtry><Cd>DP01</Cd>. That is a proprietary
+ * code whose accepted values on MiniMax's side we cannot verify from here, and
+ * guessing wrong risks the import itself rather than just the classification.
+ */
+function purposeCode(tx: Transaction, wallet: WalletConfig): string {
+  switch (tx.finTxType.toUpperCase()) {
+    case "FEE":
+      return "COMM"; // Plačilo provizije
+    case "CONVERSION_BUY":
+    case "CONVERSION_SELL":
+      return "FREX"; // Devizno poslovanje
+    case "CARD_PURCHASE":
+      return "CCRD"; // Plačilo s kreditno kartico
+    case "CARD_REFUND":
+      return "REFU"; // Vračilo denarnih sredstev
+    case "DIRECT_DEBIT":
+      return "PADD"; // Vnaprej odobrena obremenitev
+    case "PAYOUT":
+      return "SUPP"; // Plačilo dobaviteljem
+    case "DEPOSIT":
+      // Topping up our own wallet from our own bank is an internal transfer;
+      // anything else arriving is trade income.
+      return sameAsOwner(tx, wallet) ? "INTC" : "TRAD";
+    default:
+      return "OTHR";
+  }
+}
+
+function sameAsOwner(tx: Transaction, wallet: WalletConfig): boolean {
+  return tx.counterpartyName.trim().toLowerCase() === wallet.ownerName.trim().toLowerCase();
+}
+
 function rmtInfBlock(tx: Transaction): string {
   const desc = buildRemittanceText(tx);
   const ustrd = `              <Ustrd>${esc(truncate(desc, 140))}</Ustrd>
@@ -303,10 +341,16 @@ function siWrapRef(ref: string): string {
 }
 
 function buildRemittanceText(tx: Transaction): string {
+  // Ordered most- to least-identifying: MiniMax renders this after its own
+  // "Izpisek: <account> (…)" prefix, so whatever gets cut by the 140-char
+  // truncation should be the part you'd look up last.
   const parts: string[] = [];
   if (tx.counterpartyName) parts.push(tx.counterpartyName);
   if (tx.externalRef) parts.push(`Ref: ${tx.externalRef}`);
   if (tx.noteToSelf && tx.noteToSelf !== tx.externalRef) parts.push(tx.noteToSelf);
+  for (const d of tx.details) {
+    if (d && !parts.includes(d)) parts.push(d);
+  }
   if (tx.internalRef) parts.push(tx.internalRef);
   if (parts.length === 0) return tx.description;
   return parts.join(" | ");

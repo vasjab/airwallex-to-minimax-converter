@@ -40,7 +40,11 @@ export class CustomerMatcher {
         return { matched: true, customer: entry.record, confidence: "exact", score: 100 };
       }
 
-      if (norm.length >= 5 && entry.norm.length >= 5) {
+      // 4, not 5: short company names normalize below the old floor once the
+      // legal-form suffix is stripped ("Ucom d.o.o." → "ucom"), so they could
+      // never match their fuller bank-side spelling ("UCOM TRGOVINA D.O.O.").
+      // Safe because the test below is a whole-word prefix, not a substring.
+      if (norm.length >= 4 && entry.norm.length >= 4) {
         if (norm.startsWith(entry.norm + " ") || entry.norm.startsWith(norm + " ")) {
           const ratio =
             Math.min(norm.length, entry.norm.length) / Math.max(norm.length, entry.norm.length);

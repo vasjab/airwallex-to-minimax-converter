@@ -24,6 +24,7 @@ export interface Transaction {
   counterpartyIban: string;
   externalRef: string;
   internalRef: string;
+  details: string[];
   matchedCustomer?: CustomerRecord;
   matchConfidence?: MatchConfidence;
 }

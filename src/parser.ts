@@ -126,6 +126,7 @@ export function rowsToTransactions(rows: RawCsvRow[]): Transaction[] {
       counterpartyIban: parsed.iban,
       externalRef: parsed.externalRef || row["Reference"] || "",
       internalRef: parsed.internalRef,
+      details: parsed.details,
     });
   }
   return txs;
