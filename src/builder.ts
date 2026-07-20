@@ -316,10 +316,11 @@ function rmtInfBlock(tx: Transaction): string {
   const desc = buildRemittanceText(tx);
   const ustrd = `              <Ustrd>${esc(truncate(desc, 140))}</Ustrd>
 `;
-  if (tx.externalRef) {
+  const ref = siWrapRef(tx.externalRef);
+  if (ref) {
     const strd = `              <Strd>
                 <CdtrRefInf>
-                  <Ref>${esc(siWrapRef(tx.externalRef))}</Ref>
+                  <Ref>${esc(ref)}</Ref>
                 </CdtrRefInf>
               </Strd>
 `;
@@ -328,16 +329,29 @@ function rmtInfBlock(tx: Transaction): string {
   return ustrd;
 }
 
+/**
+ * Structured reference for MiniMax's "Veza (sklic)" field, or "" to omit it.
+ *
+ * MiniMax strips a leading model from <Ref>. The SI9900 wrap exists so those
+ * stripped characters are padding rather than real reference digits, and it
+ * round-trips numeric references intact. It does NOT round-trip references
+ * containing letters: "SI9900TOR260304" came back as "R260304" — eight
+ * characters consumed, not six.
+ *
+ * So we only emit a sklic we can prove survives. Anything else is dropped:
+ * a silently truncated reference is worse than an absent one, because it
+ * looks plausible while matching no invoice. The full reference is still
+ * carried as text in <Ustrd> either way.
+ */
 function siWrapRef(ref: string): string {
-  const t = ref.trim();
+  const t = (ref ?? "").trim();
+  if (!t) return "";
   if (/^SI\d{2}/.test(t) || /^RF\d{2}/.test(t)) {
     return truncate(t, 35);
   }
-  // MiniMax strips "SI" + 2-digit model + 2-char "checksum" from <Ref>.
-  // Wrap with "SI9900" so 6 chars get stripped, leaving the original ref intact.
-  // Without the "00" pad, numeric refs like "209134013" lose 2 leading digits.
+  if (!/^\d+$/.test(t)) return "";
   const wrapped = `SI9900${t}`;
-  return wrapped.length <= 35 ? wrapped : wrapped.slice(0, 35);
+  return wrapped.length <= 35 ? wrapped : "";
 }
 
 function buildRemittanceText(tx: Transaction): string {
