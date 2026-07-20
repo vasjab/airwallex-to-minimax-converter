@@ -70,15 +70,26 @@ function pickDate(time: string): string {
   return idx > 0 ? time.slice(0, idx) : time;
 }
 
+/** Available-balance holds, not ledger movements — see rowsToTransactions. */
+function isHold(finTxType: string): boolean {
+  return (
+    finTxType.startsWith("CARD_AUTHORISATION") ||
+    finTxType === "CONVERSION_RESERVE" ||
+    finTxType === "CONVERSION_RELEASE"
+  );
+}
+
 export function rowsToTransactions(rows: RawCsvRow[]): Transaction[] {
   const txs: Transaction[] = [];
   for (const row of rows) {
-    // Card authorisations and their releases are holds on the available
-    // balance only — the ledger (Account Balance) moves on CARD_PURCHASE /
-    // CARD_REFUND, and the hold amount can differ from the settled amount.
-    // The official Account Statement PDF omits them entirely.
+    // Holds move the Available Balance only — Account Balance, the actual
+    // ledger, does not budge until the settling row lands (CARD_PURCHASE /
+    // CARD_REFUND for cards, CONVERSION_SELL / CONVERSION_BUY for FX). The
+    // hold amount can also differ from the settled amount. Counting them
+    // double-books every conversion and breaks the balance walk, and the
+    // official Account Statement PDF omits them entirely.
     const finTxType = (row["Financial Transaction Type"] ?? "").toUpperCase();
-    if (finTxType.startsWith("CARD_AUTHORISATION")) continue;
+    if (isHold(finTxType)) continue;
 
     const debit = parseAmount(row["Debit Net Amount"] ?? "");
     const credit = parseAmount(row["Credit Net Amount"] ?? "");
